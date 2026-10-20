@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         My TV Room — Digi24 helper
 // @namespace    https://my-tv-room.vercel.app/
-// @version      1.8.0
+// @version      1.9.0
 // @description  Automate Digi24 in My TV Room and supported RD-S channel tabs opened from it. Starts muted automatically; click to enable sound.
 // @match        https://www.digi24.ro/live/digi24*
 // @match        https://rd-s.live/live/*
@@ -106,7 +106,7 @@
   }
 
   if (location.pathname.replace(/\/$/, '') !== '/live/digi24' || window.parent === window) return;
-  const ROOM = 'https://my-tv-room.vercel.app';
+  const ROOM = 'https://tv.scarlat.online';
   let started = false, timer, attempts = 0, busy = false, playClicked = false, settingsClicked = false, rejectClicked = false, readySince = 0, layoutObserver;
   const send = state => window.parent.postMessage({type:'tv-room-digi24-state', state}, ROOM);
   const visible = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden' && getComputedStyle(el).display !== 'none';
