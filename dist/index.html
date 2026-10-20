@@ -32,7 +32,7 @@ function selectChannel(id){
   const external=id==='sport';player.hidden=external;
   const card=document.getElementById('external-card');card.hidden=!external;card.style.display=external?'grid':'none';
   player.src=external?'about:blank':c.url;
-  if(external)status.textContent='This source requires its own tab. Choose Open Digi Sport 1 to watch.';
+  if(external)status.textContent='Digi Sport 1 opens directly in a new tab when you select its channel. Use the button below if your browser blocked it.';
   try{localStorage.setItem('tv-room-channel',id)}catch{}
 }
 player.addEventListener('load',()=>{if(selected==='news')startHelper()});
@@ -41,7 +41,7 @@ function enterFullscreen(){
   if(!viewer.requestFullscreen){status.textContent='Fullscreen is unavailable here. Use the source player’s fullscreen button.';return;}
   viewer.requestFullscreen().catch(()=>{status.textContent='Fullscreen was blocked. Click Fullscreen or use the source player’s fullscreen button.';});
 }
-function chooseChannel(id){if(id!==selected)selectChannel(id);if(id==='news')enterFullscreen();}
+function chooseChannel(id){if(id==='sport')window.open(channels.sport.url,'_blank','noopener,noreferrer');if(id!==selected)selectChannel(id);if(id==='news')enterFullscreen();}
 document.querySelectorAll('.channel').forEach(b=>b.addEventListener('click',()=>chooseChannel(b.dataset.channel)));
 document.getElementById('reload').addEventListener('click',()=>selectChannel(selected));
 document.getElementById('fullscreen').addEventListener('click',()=>{if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});else enterFullscreen()});
