@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         My TV Room — Digi24 helper
 // @namespace    https://my-tv-room.vercel.app/
-// @version      1.3.0
-// @description  Automate Digi24 in My TV Room and Digi Sport 1 tabs opened from it. Playback may start muted.
+// @version      1.4.0
+// @description  Automate Digi24 in My TV Room and Digi Sport 1 tabs opened from it. Playback requests sound; browsers may require one click.
 // @match        https://www.digi24.ro/live/digi24*
 // @match        https://rd-s.live/live/digi-sport-1/*
 // @run-at       document-idle
@@ -38,7 +38,7 @@
     function action(root,video) {
       if(document.getElementById('tv-sport-action'))return;
       const button=document.createElement('button');button.id='tv-sport-action';button.className='tv-sport-action';
-      const label=()=>{button.textContent=video.muted?'Sound on + Fullscreen':'Fullscreen';button.hidden=!!document.fullscreenElement&&!video.muted};label();
+      const label=()=>{button.textContent=(video.muted||video.paused)?'Play with sound + Fullscreen':'Fullscreen';button.hidden=!!document.fullscreenElement&&!video.muted&&!video.paused};label();
       button.addEventListener('click',()=>{video.muted=false;video.volume=1;video.play().catch(()=>{});if(!document.fullscreenElement)root.requestFullscreen?.().catch(()=>{});label()});
       document.addEventListener('fullscreenchange',label);video.addEventListener('volumechange',label);document.body.append(button);
     }
@@ -58,11 +58,12 @@
         try{sessionStorage.removeItem('tv-room-gate-count')}catch{}
         if(!settled){settled=Date.now();return;}if(Date.now()-settled<1500)return;
         fit(root);
-        if(!video.paused&&video.readyState>=2){
+        if(!video.paused&&video.readyState>=2&&!video.muted){
           clearInterval(timer);action(root,video);
           if(!fsTried){fsTried=true;root.requestFullscreen?.().catch(()=>{});}return;
         }
-        try{await video.play()}catch(e){if(e.name==='NotAllowedError'){video.muted=true;try{await video.play()}catch{};action(root,video)}}
+        video.muted=false;video.volume=1;
+        try{await video.play()}catch(e){if(e.name==='NotAllowedError'){clearInterval(timer);action(root,video)}}
       }finally{busy=false}
     },1000);
     return;
@@ -114,7 +115,7 @@
     if (document.getElementById('tv-room-unmute')) return;
     const button = document.createElement('button');
     button.id = 'tv-room-unmute'; button.className = 'tv-room-unmute';
-    button.textContent = 'Turn sound on';
+    button.textContent = 'Play with sound';
     button.addEventListener('click', () => { video.muted = false; video.volume = 1; video.play().catch(()=>{}); button.remove(); });
     video.addEventListener('volumechange',()=>{if(!video.muted)button.remove();});
     document.body.append(button);
@@ -146,7 +147,7 @@
       if (!readySince) { readySince = Date.now(); return; }
       if (Date.now() - readySince < 2000) return;
       theater();
-      if (!video.paused && video.readyState >= 2) {
+      if (!video.paused && video.readyState >= 2 && !video.muted) {
         clearInterval(timer); send(video.muted ? 'playing-muted' : 'playing');
         if (video.muted) unmuteButton(video);
         return;
@@ -155,11 +156,12 @@
         const play = root.querySelector('.jw-icon-display[aria-label="Redare"], .jw-icon-display[aria-label="Play"]');
         if (visible(play)) { playClicked = true; play.click(); }
       }
+      video.muted = false; video.volume = 1;
       try { await video.play(); }
       catch (error) {
         if (error.name === 'NotAllowedError') {
-          video.muted = true;
-          try { await video.play(); } catch { send('manual'); }
+          clearInterval(timer);
+          unmuteButton(video); send('manual');
         }
       }
     } finally { busy = false; }
