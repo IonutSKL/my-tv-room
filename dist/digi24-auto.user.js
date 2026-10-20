@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         My TV Room — Digi24 helper
 // @namespace    https://my-tv-room.vercel.app/
-// @version      1.6.0
+// @version      1.7.0
 // @description  Automate Digi24 in My TV Room and Digi Sport 1 tabs opened from it. Starts muted automatically; click to enable sound.
 // @match        https://www.digi24.ro/live/digi24*
 // @match        https://rd-s.live/live/digi-sport-1/*
@@ -59,6 +59,24 @@
       for(const name of ['volumechange','play','pause'])video.addEventListener(name,label);
       root.append(button);
     }
+    let speakerAttempted=false;
+    function trySpeakerOnce(root,video) {
+      if(speakerAttempted)return;
+      speakerAttempted=true;
+      setTimeout(()=>{
+        if(soundEnabled||video.paused||!video.muted)return;
+        const speaker=root.querySelector('button[data-pc="mute"]');
+        if(!speaker)return;
+        soundEnabled=true;
+        speaker.click();
+        setTimeout(()=>{
+          if(video.paused||video.muted){
+            soundEnabled=false;video.muted=true;
+            video.play().catch(()=>{});
+          }
+        },700);
+      },1200);
+    }
     const timer=setInterval(async()=>{
       if(busy)return;busy=true;
       try{
@@ -76,7 +94,7 @@
         if(!settled){settled=Date.now();return;}if(Date.now()-settled<1500)return;
         fit(root);
         if(!video.paused&&video.readyState>=2){
-          clearInterval(timer);action(root,video);
+          clearInterval(timer);action(root,video);trySpeakerOnce(root,video);
           if(!fsTried){fsTried=true;root.requestFullscreen?.().catch(()=>{});}return;
         }
         video.muted=true;
