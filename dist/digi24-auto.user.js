@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         My TV Room — Digi24 helper
 // @namespace    https://my-tv-room.vercel.app/
-// @version      1.7.0
-// @description  Automate Digi24 in My TV Room and Digi Sport 1 tabs opened from it. Starts muted automatically; click to enable sound.
+// @version      1.8.0
+// @description  Automate Digi24 in My TV Room and supported RD-S channel tabs opened from it. Starts muted automatically; click to enable sound.
 // @match        https://www.digi24.ro/live/digi24*
-// @match        https://rd-s.live/live/digi-sport-1/*
+// @match        https://rd-s.live/live/*
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -12,9 +12,10 @@
 (() => {
   'use strict';
   if (location.hostname === 'rd-s.live') {
-    if (location.pathname.replace(/\/$/,'') !== '/live/digi-sport-1' || window.parent !== window) return;
+    const supportedPaths=["/live/digi-sport-1","/live/pro-tv","/live/antena-1","/live/antena-3-cnn","/live/digi-sport-2","/live/digi-sport-3","/live/digi-sport-4","/live/hbo"];
+    if (!supportedPaths.includes(location.pathname.replace(/\/$/,'')) || window.parent !== window) return;
     let active = location.hash === '#tvroom=1';
-    try { if(active)sessionStorage.setItem('tv-room-sport','1'); active ||= sessionStorage.getItem('tv-room-sport') === '1'; } catch {}
+    try { if(active)sessionStorage.setItem('tv-room-rds:'+location.pathname,'1'); active ||= sessionStorage.getItem('tv-room-rds:'+location.pathname) === '1'; } catch {}
     if (!active) return;
     const visible = e => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
     let busy=false, attempts=0, gateClicked=false, settled=0, fsTried=false, soundEnabled=false;
