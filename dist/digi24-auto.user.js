@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         My TV Room — Digi24 helper
 // @namespace    https://my-tv-room.vercel.app/
-// @version      1.4.0
+// @version      1.5.0
 // @description  Automate Digi24 in My TV Room and Digi Sport 1 tabs opened from it. Playback requests sound; browsers may require one click.
 // @match        https://www.digi24.ro/live/digi24*
 // @match        https://rd-s.live/live/digi-sport-1/*
@@ -39,8 +39,25 @@
       if(document.getElementById('tv-sport-action'))return;
       const button=document.createElement('button');button.id='tv-sport-action';button.className='tv-sport-action';
       const label=()=>{button.textContent=(video.muted||video.paused)?'Play with sound + Fullscreen':'Fullscreen';button.hidden=!!document.fullscreenElement&&!video.muted&&!video.paused};label();
-      button.addEventListener('click',()=>{video.muted=false;video.volume=1;video.play().catch(()=>{});if(!document.fullscreenElement)root.requestFullscreen?.().catch(()=>{});label()});
-      document.addEventListener('fullscreenchange',label);video.addEventListener('volumechange',label);document.body.append(button);
+      const resume=()=>{const current=root.querySelector('video.rp__video')||video;current.muted=false;current.volume=1;return current.play().catch(()=>{label()});};
+      button.addEventListener('click',async event=>{
+        event.preventDefault();event.stopPropagation();
+        // Request fullscreen during the trusted click, then resume after its transition.
+        let transition;
+        if(!document.fullscreenElement)transition=root.requestFullscreen?.();
+        await resume();
+        if(transition){try{await transition}catch{}}
+        await resume();label();
+      });
+      document.addEventListener('fullscreenchange',()=>{
+        label();
+        if(document.fullscreenElement===root){
+          // The source may pause its player while rebuilding fullscreen controls.
+          setTimeout(()=>{if(document.fullscreenElement===root)resume().then(label)},150);
+        }
+      });
+      for(const name of ['volumechange','play','pause'])video.addEventListener(name,label);
+      root.append(button);
     }
     const timer=setInterval(async()=>{
       if(busy)return;busy=true;
