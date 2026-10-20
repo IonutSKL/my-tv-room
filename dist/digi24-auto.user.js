@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         My TV Room — Digi24 helper
 // @namespace    https://my-tv-room.vercel.app/
-// @version      1.0.0
-// @description  Accept Digi24 cookies and start its live player only when requested by My TV Room. May start muted when Chrome requires it.
+// @version      1.1.0
+// @description  Reject optional Digi24 cookies and start its live player only when requested by My TV Room. May start muted when Chrome requires it.
 // @match        https://www.digi24.ro/live/digi24*
 // @run-at       document-idle
 // @grant        none
@@ -12,7 +12,7 @@
   'use strict';
   if (location.pathname.replace(/\/$/, '') !== '/live/digi24' || window.parent === window) return;
   const ROOM = 'https://my-tv-room.vercel.app';
-  let started = false, timer, attempts = 0, busy = false, playClicked = false, acceptClicked = false;
+  let started = false, timer, attempts = 0, busy = false, playClicked = false, settingsClicked = false, rejectClicked = false;
   const send = state => window.parent.postMessage({type:'tv-room-digi24-state', state}, ROOM);
   const visible = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden' && getComputedStyle(el).display !== 'none';
   function theater() {
@@ -36,13 +36,19 @@
     busy = true;
     try {
       if (++attempts > 60) { clearInterval(timer); send('manual'); return; }
-      const accept = document.getElementById('onetrust-accept-btn-handler');
+      const settings = document.getElementById('onetrust-pc-btn-handler');
       const banner = document.getElementById('onetrust-banner-sdk');
-      if (visible(accept)) {
-        if (!acceptClicked) { acceptClicked = true; accept.click(); send('consent'); }
+      const preferences = document.getElementById('onetrust-pc-sdk');
+      const reject = preferences?.querySelector('.ot-pc-refuse-all-handler');
+      if (visible(reject)) {
+        if (!rejectClicked) { rejectClicked = true; reject.click(); send('rejected'); }
         return;
       }
-      if (visible(banner)) return;
+      if (visible(banner)) {
+        if (visible(settings) && !settingsClicked) { settingsClicked = true; settings.click(); send('privacy'); }
+        return;
+      }
+      if (visible(preferences)) return;
       const root = document.getElementById('video-player-live');
       const video = root?.querySelector('video');
       if (!video) return;
