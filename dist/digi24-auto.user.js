@@ -1,15 +1,73 @@
 // ==UserScript==
 // @name         My TV Room — Digi24 helper
 // @namespace    https://my-tv-room.vercel.app/
-// @version      1.2.0
-// @description  Reject optional Digi24 cookies and start its live player only when requested by My TV Room. May start muted when Chrome requires it.
+// @version      1.3.0
+// @description  Automate Digi24 in My TV Room and Digi Sport 1 tabs opened from it. Playback may start muted.
 // @match        https://www.digi24.ro/live/digi24*
+// @match        https://rd-s.live/live/digi-sport-1/*
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
 
 (() => {
   'use strict';
+  if (location.hostname === 'rd-s.live') {
+    if (location.pathname.replace(/\/$/,'') !== '/live/digi-sport-1' || window.parent !== window) return;
+    let active = location.hash === '#tvroom=1';
+    try { if(active)sessionStorage.setItem('tv-room-sport','1'); active ||= sessionStorage.getItem('tv-room-sport') === '1'; } catch {}
+    if (!active) return;
+    const visible = e => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
+    let busy=false, attempts=0, gateClicked=false, settled=0, fsTried=false;
+    function fit(root) {
+      for(const e of document.querySelectorAll('.tv-sport-path'))e.classList.remove('tv-sport-path');
+      for(let p=root.parentElement;p&&p!==document.documentElement;p=p.parentElement)p.classList.add('tv-sport-path');
+      root.classList.add('tv-sport-player'); document.body.classList.add('tv-sport-mode');
+      if(document.getElementById('tv-sport-style'))return;
+      const style=document.createElement('style');style.id='tv-sport-style';style.textContent=`
+        html,body.tv-sport-mode{margin:0!important;overflow:hidden!important;background:#000!important}
+        .tv-sport-path{transform:none!important;filter:none!important;contain:none!important;perspective:none!important;overflow:visible!important}
+        .tv-sport-path > :not(.tv-sport-path):not(.tv-sport-player):not(.tv-sport-action):not(style):not(script){display:none!important}
+        .tv-sport-player{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;max-width:none!important;margin:0!important;aspect-ratio:auto!important;z-index:2147483000!important;background:#000!important}
+        .tv-sport-player .rp__stage{width:100%!important;height:100%!important;aspect-ratio:auto!important}
+        .tv-sport-player video{width:100%!important;height:100%!important;object-fit:contain!important}
+        .tv-sport-action{position:fixed;top:16px;right:16px;z-index:2147483647;padding:12px 18px;border:0;border-radius:8px;background:#d7f584;color:#172014;font:600 14px system-ui;cursor:pointer}`;
+      document.head.append(style);
+      let queued=false;const observer=new MutationObserver(()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;const current=document.querySelector('.rp__video')?.closest('.rp');if(current)fit(current)})});
+      observer.observe(document.body,{childList:true,subtree:true});window.addEventListener('pagehide',()=>observer.disconnect(),{once:true});
+    }
+    function action(root,video) {
+      if(document.getElementById('tv-sport-action'))return;
+      const button=document.createElement('button');button.id='tv-sport-action';button.className='tv-sport-action';
+      const label=()=>{button.textContent=video.muted?'Sound on + Fullscreen':'Fullscreen';button.hidden=!!document.fullscreenElement&&!video.muted};label();
+      button.addEventListener('click',()=>{video.muted=false;video.volume=1;video.play().catch(()=>{});if(!document.fullscreenElement)root.requestFullscreen?.().catch(()=>{});label()});
+      document.addEventListener('fullscreenchange',label);video.addEventListener('volumechange',label);document.body.append(button);
+    }
+    const timer=setInterval(async()=>{
+      if(busy)return;busy=true;
+      try{
+        if(++attempts>80){clearInterval(timer);return;}
+        const gate=document.querySelector('button.player-gate');
+        if(visible(gate)){
+          if(!gateClicked){
+            let count=0;try{count=Number(sessionStorage.getItem('tv-room-gate-count'))||0;if(count<2)sessionStorage.setItem('tv-room-gate-count',String(count+1))}catch{}
+            if(count<2){gateClicked=true;gate.click();}
+          }
+          return;
+        }
+        const video=document.querySelector('video.rp__video'),root=video?.closest('.rp');if(!root)return;
+        try{sessionStorage.removeItem('tv-room-gate-count')}catch{}
+        if(!settled){settled=Date.now();return;}if(Date.now()-settled<1500)return;
+        fit(root);
+        if(!video.paused&&video.readyState>=2){
+          clearInterval(timer);action(root,video);
+          if(!fsTried){fsTried=true;root.requestFullscreen?.().catch(()=>{});}return;
+        }
+        try{await video.play()}catch(e){if(e.name==='NotAllowedError'){video.muted=true;try{await video.play()}catch{};action(root,video)}}
+      }finally{busy=false}
+    },1000);
+    return;
+  }
+
   if (location.pathname.replace(/\/$/, '') !== '/live/digi24' || window.parent === window) return;
   const ROOM = 'https://my-tv-room.vercel.app';
   let started = false, timer, attempts = 0, busy = false, playClicked = false, settingsClicked = false, rejectClicked = false, readySince = 0, layoutObserver;
