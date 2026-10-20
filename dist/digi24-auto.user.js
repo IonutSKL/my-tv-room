@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         My TV Room — Digi24 helper
 // @namespace    https://my-tv-room.vercel.app/
-// @version      1.5.0
-// @description  Automate Digi24 in My TV Room and Digi Sport 1 tabs opened from it. Playback requests sound; browsers may require one click.
+// @version      1.6.0
+// @description  Automate Digi24 in My TV Room and Digi Sport 1 tabs opened from it. Starts muted automatically; click to enable sound.
 // @match        https://www.digi24.ro/live/digi24*
 // @match        https://rd-s.live/live/digi-sport-1/*
 // @run-at       document-idle
@@ -17,7 +17,7 @@
     try { if(active)sessionStorage.setItem('tv-room-sport','1'); active ||= sessionStorage.getItem('tv-room-sport') === '1'; } catch {}
     if (!active) return;
     const visible = e => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
-    let busy=false, attempts=0, gateClicked=false, settled=0, fsTried=false;
+    let busy=false, attempts=0, gateClicked=false, settled=0, fsTried=false, soundEnabled=false;
     function fit(root) {
       for(const e of document.querySelectorAll('.tv-sport-path'))e.classList.remove('tv-sport-path');
       for(let p=root.parentElement;p&&p!==document.documentElement;p=p.parentElement)p.classList.add('tv-sport-path');
@@ -38,10 +38,10 @@
     function action(root,video) {
       if(document.getElementById('tv-sport-action'))return;
       const button=document.createElement('button');button.id='tv-sport-action';button.className='tv-sport-action';
-      const label=()=>{button.textContent=(video.muted||video.paused)?'Play with sound + Fullscreen':'Fullscreen';button.hidden=!!document.fullscreenElement&&!video.muted&&!video.paused};label();
-      const resume=()=>{const current=root.querySelector('video.rp__video')||video;current.muted=false;current.volume=1;return current.play().catch(()=>{label()});};
+      const label=()=>{button.textContent=(video.muted||video.paused)?'Enable sound':'Fullscreen';button.hidden=!!document.fullscreenElement&&!video.muted&&!video.paused};label();
+      const resume=()=>{const current=root.querySelector('video.rp__video')||video;current.muted=!soundEnabled;if(soundEnabled)current.volume=1;return current.play().catch(()=>{label()});};
       button.addEventListener('click',async event=>{
-        event.preventDefault();event.stopPropagation();
+        event.preventDefault();event.stopPropagation();soundEnabled=true;
         // Request fullscreen during the trusted click, then resume after its transition.
         let transition;
         if(!document.fullscreenElement)transition=root.requestFullscreen?.();
@@ -75,11 +75,11 @@
         try{sessionStorage.removeItem('tv-room-gate-count')}catch{}
         if(!settled){settled=Date.now();return;}if(Date.now()-settled<1500)return;
         fit(root);
-        if(!video.paused&&video.readyState>=2&&!video.muted){
+        if(!video.paused&&video.readyState>=2){
           clearInterval(timer);action(root,video);
           if(!fsTried){fsTried=true;root.requestFullscreen?.().catch(()=>{});}return;
         }
-        video.muted=false;video.volume=1;
+        video.muted=true;
         try{await video.play()}catch(e){if(e.name==='NotAllowedError'){clearInterval(timer);action(root,video)}}
       }finally{busy=false}
     },1000);
@@ -132,7 +132,7 @@
     if (document.getElementById('tv-room-unmute')) return;
     const button = document.createElement('button');
     button.id = 'tv-room-unmute'; button.className = 'tv-room-unmute';
-    button.textContent = 'Play with sound';
+    button.textContent = 'Enable sound';
     button.addEventListener('click', () => { video.muted = false; video.volume = 1; video.play().catch(()=>{}); button.remove(); });
     video.addEventListener('volumechange',()=>{if(!video.muted)button.remove();});
     document.body.append(button);
@@ -164,7 +164,7 @@
       if (!readySince) { readySince = Date.now(); return; }
       if (Date.now() - readySince < 2000) return;
       theater();
-      if (!video.paused && video.readyState >= 2 && !video.muted) {
+      if (!video.paused && video.readyState >= 2) {
         clearInterval(timer); send(video.muted ? 'playing-muted' : 'playing');
         if (video.muted) unmuteButton(video);
         return;
@@ -173,7 +173,7 @@
         const play = root.querySelector('.jw-icon-display[aria-label="Redare"], .jw-icon-display[aria-label="Play"]');
         if (visible(play)) { playClicked = true; play.click(); }
       }
-      video.muted = false; video.volume = 1;
+      video.muted = true;
       try { await video.play(); }
       catch (error) {
         if (error.name === 'NotAllowedError') {
